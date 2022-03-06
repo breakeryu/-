@@ -1,0 +1,390 @@
+<html>
+<head>
+  <title>Evernote Export</title>
+  <basefont face="微软雅黑" size="2" />
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+  <meta name="exporter-version" content="YXBJ Windows/602051 (zh-CN, DDL); Windows/10.0.0 (Win64); EDAMVersion=V2;"/>
+  <meta name="content-class" content="yinxiang.markdown"/>
+  <style>
+    body, td {
+      font-family: 微软雅黑;
+      font-size: 10pt;
+    }
+  </style>
+</head>
+<body>
+<a name="5510"/>
+
+<div><span><div style="font-size: 14px; margin: 0; padding: 0; width: 100%;"><h1 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 41px; border-bottom: 3px double #999; color: #000; margin-top: 14px;">JSON串口通信</h1>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">本文主要介绍如何使用arduinojson库进行arduino的串口通信协议构建。</p>
+<h2 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 34px; border-bottom: 1px solid #dbdbdb; color: #333;">1.环境介绍</h2>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">首先，JSON 指的是 JavaScript 对象表示法（JavaScript Object Notation）。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">json语法的特性：</p>
+<ul style="line-height: 160%; box-sizing: content-box; display: block; list-style-type: disc; padding-left: 30px; margin: 6px 0 10px; color: #333;">
+<li style="line-height: 160%; box-sizing: content-box; position: relative;">
+<p style="line-height: 160%; box-sizing: content-box; color: #333; margin: 0;">JSON 是轻量级的文本数据交换格式</p>
+</li>
+<li style="line-height: 160%; box-sizing: content-box; position: relative;">
+<p style="line-height: 160%; box-sizing: content-box; color: #333; margin: 0;">JSON 独立于语言 *</p>
+</li>
+<li style="line-height: 160%; box-sizing: content-box; position: relative;">
+<p style="line-height: 160%; box-sizing: content-box; color: #333; margin: 0;">JSON 具有自我描述性，更易理解。</p>
+</li>
+</ul>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">使用json来作为单片机软件解包交互的方式是一种能够减少对协议和解析算法的时间投入，<br/>
+对于初学者或者想尝试json的人来说是一种可以尝试一下的新东西。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">但是，使用该库的代价是消耗大量的内存空间。<br/>
+天下没有免费的午餐，也没有十全十美的方案，我们只能做智慧的取舍。</p>
+<h2 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 34px; border-bottom: 1px solid #dbdbdb; color: #333;">2.如何使用ArduinoJson库</h2>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">我们可以进入官网进行学习该库，官方网址：https://arduinojson.org。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">值得一说的是，arduino现在不仅是一个主流开源平台，而且现在平台不只是有arduino的几款<br/>
+单品机平台，现在PIO的支持，arduino框架下可以支持上百种MCU，如果使用该框架，意味着我们也可以在<br/>
+其他板子上面使用arduino种的库。我已经使用该库进行测试，运行环境为：STM32L475正点原子潘多拉开发板。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">这里顺带附一张图片，这是我了解到JSON库的一张图片：</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;"><img src="JSON串口通信_files/Json.jpg" type="image/jpeg" data-filename="Json.jpg"/></p>
+<h2 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 34px; border-bottom: 1px solid #dbdbdb; color: #333;">3.测试DEMO</h2>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">使用该库是用来解决串口通信协议的解析麻烦。这里测试的demo使用两块arduino UNO，使用软串口进行主从机通信。</p>
+<h3 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 27px; color: #333;">3.1 主机demo</h3>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">这里主机进行两个信号的赋值操作，然后将信号写入字符串中，在一定的条件下，发送给从机。<br/>
+主要代码段：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+
+StaticJsonDocument&lt;<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">200</span>&gt; doc;  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//定义内存静态200，准备存放的地方</span>
+
+
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">DataTxInit</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">(<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span>)</span> </span>{
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//Slave1串口初始化</span>
+
+        jsonSerial.begin(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">9600</span>);
+
+        
+
+}
+
+
+
+<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//数据处理使用字符串处理来做</span>
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">StringsPrcess</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">(<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span>)</span> </span>{
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//{&quot;Device&quot;:&quot;Slave1&quot;,&quot;StartSignal&quot;:0,&quot;ResetSignal&quot;:0}</span>
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//{\&quot;Device\&quot;:\&quot;Slave1\&quot;,\&quot;StartSignal\&quot;:0,\&quot;ResetSignal\&quot;:0}</span>
+
+
+
+        Slave1Control = <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;{&quot;</span>;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;\&quot;Device\&quot;:\&quot;Slave1\&quot;,\&quot;StartSignal\&quot;:&quot;</span>;
+
+        Slave1Control += myBalanceAngle.aState;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;,&quot;</span>;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;\&quot;ResetSignal\&quot;:&quot;</span>;
+
+        Slave1Control += myBalanceAngle.fState;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;}&quot;</span>;
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//Serial.println(Slave1Control);</span>
+
+}
+
+
+
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> lastaState = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>, lastfState = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;
+
+
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">Slave1TxData</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">(<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span>)</span> </span>{
+
+
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//这里防止误触，如果连续按两次同一个按键，不会触发两次使能信号。</span>
+
+        <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span> (myBalanceAngle.aState == <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">1</span> || myBalanceAngle.fState == <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">1</span>)
+
+        {
+
+               <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//如果变量被更改了</span>
+
+               <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span> (lastaState != myBalanceAngle.aState || lastfState != 
+myBalanceAngle.fState)
+
+               {
+
+                       <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//发送json序列到从机</span>
+
+                       StringsPrcess();
+
+                       jsonSerial.println(Slave1Control);
+
+               }
+
+               
+
+               
+
+               <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//接收回复的信息</span>
+
+
+
+               lastaState = myBalanceAngle.aState;
+
+               lastfState = myBalanceAngle.fState;
+
+        }
+
+
+
+        <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span> (myBalanceAngle.aState == <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">1</span>)
+
+        {
+
+               <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//发送信号之后将主机寄存器值清零</span>
+
+               myBalanceAngle.aState = <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>;
+
+        }
+
+
+
+        <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span> (myBalanceAngle.fState == <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">1</span>)
+
+        {
+
+               <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//发送信号之后将主机寄存器值清零</span>
+
+               myBalanceAngle.fState = <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>;
+
+        }
+
+
+
+}
+
+
+
+
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">首先，我们需要明白一点，发送信息的单片机，发送的是字节，不是JSON语言。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">如果你懂了前提，我们接着来了解一点字符串处理的事情。<br/>
+在arduino中，我们定义一个String，用于写入我们的JSON语段，这里举一个例子：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+{   
+    <span style="color: #9cdcfe; line-height: 160%; box-sizing: content-box;">&quot;Device&quot;</span>:<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;Slave1&quot;</span>,   
+    <span style="color: #9cdcfe; line-height: 160%; box-sizing: content-box;">&quot;StartSignal&quot;</span>: <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>,   
+    <span style="color: #9cdcfe; line-height: 160%; box-sizing: content-box;">&quot;ResetSignal&quot;</span>: <span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>
+ }
+
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">这里是我们要进行发送的json语段，我们定义了发送的接收设备号： &quot;Device&quot;，他的key值为：&quot;Slave1&quot;。<br/>
+接着，第二个和第三个key的名字为两个发送的信号的名字，分别为：  &quot;StartSignal&quot;和 &quot;ResetSignal&quot;，<br/>
+他们的key值我们进行了默认的为0。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">好的，这里的json发送的数据就介绍完了。<br/>
+那么，我们进行发送这一数据是怎么做的呢？</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">在我进行测试的时候，首先是使用char数组来进行json字符保存的，可是我发现这种方式没有String的方<br/>
+法方便。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">使用arduino的字符串处理功能，可以方便的做字符串的加法，我们可以将我们的数据或者字母添加到字符串<br/>
+中。例如上面代码中处理字符串的函数：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//数据处理使用字符串处理来做</span>
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">StringsPrcess</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">(<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span>)</span> </span>{
+
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//{\&quot;Device\&quot;:\&quot;Slave1\&quot;,\&quot;StartSignal\&quot;:0,\&quot;ResetSignal\&quot;:0}</span>
+
+
+
+        Slave1Control = <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;{&quot;</span>;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;\&quot;Device\&quot;:\&quot;Slave1\&quot;,\&quot;StartSignal\&quot;:&quot;</span>;
+
+        Slave1Control += myBalanceAngle.aState;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;,&quot;</span>;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;\&quot;ResetSignal\&quot;:&quot;</span>;
+
+        Slave1Control += myBalanceAngle.fState;
+
+        Slave1Control += <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;}&quot;</span>;
+
+        <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//Serial.println(Slave1Control);</span>
+
+}
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">代码中的变量的值，也就是：myBalanceAngle.aState和myBalanceAngle.fState，是我们要发送的信号值。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">这里需要指出的是，变量是在传感器读入数据后便会更新，更新之后，我们通过条件的判断来将json语段<br/>
+进行处理更新。这便是以上的代码做的事情。</p>
+<h2 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 34px; border-bottom: 1px solid #dbdbdb; color: #333;">3.2 从机demo</h2>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">从机需要保存主机发过来的字符串数据，然后解析数据，并且将有用数据存储在内存中。<br/>
+主要代码段：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">#<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">include</span> <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&lt;SoftwareSerial.h&gt;</span></span>
+<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">#<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">include</span> <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&lt;ArduinoJson.h&gt;</span></span>
+
+<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//{&quot;Device&quot;:&quot;vibration_motor&quot;,&quot;SetSpd&quot;:[3,3,3,3],&quot;WorkState&quot;:0}</span>
+StaticJsonDocument&lt;<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">200</span>&gt; doc;  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//定义内存静态200，准备存放的地方</span>
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">SoftwareSerial <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">mySerial</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">4</span>,<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">5</span>)</span></span>; <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">// RX, TX</span>
+
+<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">#<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">define</span> JsonLength 100</span>
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">char</span> json[JsonLength];<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//用于存放的长度要大于JSON发送的长度</span>
+String data = <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;&quot;</span>;
+
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> myaState = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//用来标志启动程序的FLAG</span>
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> myfState = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//用来标志复位电机的FLAG</span>
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">setup</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">()</span> </span>{
+  
+  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">// put your setup code here, to run once:</span>
+  Serial.begin(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">9600</span>);
+  mySerial.begin(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">9600</span>);
+  
+}
+
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> ReceiveFlag = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">loop</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">()</span> </span>{
+
+  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//mySerial.listen();</span>
+  <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">while</span>(mySerial.available()&gt;<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>){
+    data += (<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">char</span>)(mySerial.read());
+    ReceiveFlag = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">true</span>;
+  }
+  
+  <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span>(ReceiveFlag){
+
+    data.toCharArray(json,JsonLength);
+    DeserializationError error = deserializeJson(doc, json);
+    
+    <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span>(!error){
+      <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//serializeJsonPretty(doc, Serial);</span>
+      myaState = doc[<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;StartSignal&quot;</span>];
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;myaState = &quot;</span>);
+      Serial.print(myaState);
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;  &quot;</span>);
+      myfState = doc[<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;ResetSignal&quot;</span>];
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;myfState = &quot;</span>);
+      Serial.println(myfState);
+      ReceiveFlag=<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;
+      data = <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;&quot;</span>;
+     }
+    
+  }
+  
+ delay(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">20</span>);
+}
+
+
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">这里从机需要首先接收到主机发送的字符串。这里假设我们的主机发送的数据只有一个json<br/>
+语句。所以我们使用一个String来保存每次发送过来的数据。接收数据的代码为：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+ <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">while</span>(mySerial.available()&gt;<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>){
+    data += (<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">char</span>)(mySerial.read());
+    ReceiveFlag = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">true</span>;
+  }
+
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">使用的ArduinoJson库中给出的example中都是处理char数组，这里我也是尝试能不能使用json库<br/>
+直接处理我们的string呢？</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">我测试后，发现我自己直接的解析string是不可以的。为什么不可以？因为我自己测试错了。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">在写这篇博文的时候，我回去重新做了测试，使用string直接进行解析，是可以的。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">测试代码：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+
+<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">#<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">include</span> <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&lt;SoftwareSerial.h&gt;</span></span>
+<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">#<span style="color: #9b9b9b; line-height: 160%; box-sizing: content-box;">include</span> <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&lt;ArduinoJson.h&gt;</span></span>
+
+<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//{&quot;Device&quot;:&quot;vibration_motor&quot;,&quot;SetSpd&quot;:[3,3,3,3],&quot;WorkState&quot;:0}</span>
+StaticJsonDocument&lt;<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">200</span>&gt; doc;  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//定义内存静态200，准备存放的地方</span>
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">SoftwareSerial <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">mySerial</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">4</span>,<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">5</span>)</span></span>; <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">// RX, TX</span>
+
+<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//#define JsonLength 100</span>
+<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//char json[JsonLength];//用于存放的长度要大于JSON发送的长度</span>
+String data = <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;&quot;</span>;
+
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> ReceiveFlag = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> myaState = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//用来标志启动程序的FLAG</span>
+<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">bool</span> myfState = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;<span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//用来标志复位电机的FLAG</span>
+
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">setup</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">()</span> </span>{
+  
+  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">// put your setup code here, to run once:</span>
+  Serial.begin(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">9600</span>);
+  mySerial.begin(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">9600</span>);
+  
+}
+
+
+
+
+
+<span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;"><span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">void</span> <span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">loop</span><span style="color: #dcdcdc; line-height: 160%; box-sizing: content-box;">()</span> </span>{
+  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">// put your main code here, to run repeatedly:</span>
+  <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//mySerial.listen();</span>
+  <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">while</span>(mySerial.available()&gt;<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">0</span>){
+    data += (<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">char</span>)(mySerial.read());
+    ReceiveFlag = <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">true</span>;
+  }
+  
+  <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span>(ReceiveFlag){
+
+    <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//data.toCharArray(json,JsonLength);</span>
+    DeserializationError error = deserializeJson(doc, data);
+    <span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">if</span>(!error){
+      <span style="color: #57a64a; font-style: italic; line-height: 160%; box-sizing: content-box;">//serializeJsonPretty(doc, Serial);</span>
+      myaState = doc[<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;StartSignal&quot;</span>];
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;myaState = &quot;</span>);
+      Serial.print(myaState);
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;  &quot;</span>);
+      myfState = doc[<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;ResetSignal&quot;</span>];
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;myfState = &quot;</span>);
+      Serial.println(myfState);
+      ReceiveFlag=<span style="color: #569cd6; line-height: 160%; box-sizing: content-box;">false</span>;
+      data = <span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;&quot;</span>;
+     }
+    
+  }
+  
+ delay(<span style="color: #b8d7a3; line-height: 160%; box-sizing: content-box;">20</span>);
+}
+
+
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">测试结果为：</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;"><img src="JSON串口通信_files/Image.png" type="image/png" data-filename="Image.png"/></p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">看到测试结果，我们回到代码。json库怎么使用解析得到的字符串，从而得到我们想要的key的值呢？</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">首先我们定义了存放json解析后数据的内存空间：<br/>
+<code style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; color: #c1788b; padding: 4px 4px 2px 0; letter-spacing: -.3px;">StaticJsonDocument&lt;200&gt; doc; //定义内存静态200，准备存放的地方</code><br/>
+接着，声明使用的用于接收串口数据的字符串：<br/>
+<code style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; color: #c1788b; padding: 4px 4px 2px 0; letter-spacing: -.3px;">String ;</code><br/>
+在loop中，我们使用串口循环读入数据，最终将所有的数据存放在data字符串中，然后进行字符串的<br/>
+解析，这里的代码我们使用了反序列化函数：<br/>
+<code style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; color: #c1788b; padding: 4px 4px 2px 0; letter-spacing: -.3px;">DeserializationError error = deserializeJson(doc, data);</code><br/>
+这里的返回值是error，如果解析错误，返回值为1，正确解析，返回值为0。<br/>
+这里使用if判断，错误解析的时候，则不会进行我们的处理。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">接下来是使用解析后的doc中的key的名字来取key的值，这里使用的代码：</p>
+<pre style="line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; margin: 2px 0 8px; background-color: #f5f7f8;"><code style="display: block; overflow-x: auto; background: #1e1e1e; line-height: 160%; box-sizing: content-box; border: 0; border-radius: 0; letter-spacing: -.3px; padding: 18px; color: #f4f4f4; white-space: pre-wrap;">
+      myaState = doc[<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;StartSignal&quot;</span>];
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;myaState = &quot;</span>);
+      Serial.print(myaState);
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;  &quot;</span>);
+      myfState = doc[<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;ResetSignal&quot;</span>];
+      Serial.print(<span style="color: #d69d85; line-height: 160%; box-sizing: content-box;">&quot;myfState = &quot;</span>);
+      Serial.println(myfState);
+    
+</code></pre>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">这样，我们就达到了我们的目的。</p>
+<h1 style="line-height: 160%; box-sizing: content-box; font-weight: 700; font-size: 41px; border-bottom: 3px double #999; color: #000;">4.总结</h1>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">使用json需要注意key的名字和值，他们的构造可以使用该网站进行辅助：https://www.json.cn。<br/>
+另外，ArduinoJson官网中，也有相当不错的工具：https://arduinojson.org/v6/assistant。</p>
+<p style="line-height: 160%; box-sizing: content-box; margin: 10px 0; color: #333;">对于JSON，我们可以利用他来做快速项目开发，解决数据包的协议复杂困难。</p>
+</div><center style="display:none !important;visibility:collapse !important;height:0 !important;white-space:nowrap;width:100%;overflow:hidden">%23%20JSON%E4%B8%B2%E5%8F%A3%E9%80%9A%E4%BF%A1%0A%E6%9C%AC%E6%96%87%E4%B8%BB%E8%A6%81%E4%BB%8B%E7%BB%8D%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8arduinojson%E5%BA%93%E8%BF%9B%E8%A1%8Carduino%E7%9A%84%E4%B8%B2%E5%8F%A3%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE%E6%9E%84%E5%BB%BA%E3%80%82%0A%23%23%201.%E7%8E%AF%E5%A2%83%E4%BB%8B%E7%BB%8D%0A%0A%E9%A6%96%E5%85%88%EF%BC%8CJSON%C2%A0%E6%8C%87%E7%9A%84%E6%98%AF%C2%A0JavaScript%C2%A0%E5%AF%B9%E8%B1%A1%E8%A1%A8%E7%A4%BA%E6%B3%95%EF%BC%88JavaScript%C2%A0Object%C2%A0Notation%EF%BC%89%E3%80%82%0A%0Ajson%E8%AF%AD%E6%B3%95%E7%9A%84%E7%89%B9%E6%80%A7%EF%BC%9A%0A%0A*%20JSON%C2%A0%E6%98%AF%E8%BD%BB%E9%87%8F%E7%BA%A7%E7%9A%84%E6%96%87%E6%9C%AC%E6%95%B0%E6%8D%AE%E4%BA%A4%E6%8D%A2%E6%A0%BC%E5%BC%8F%0A%0A*%20JSON%C2%A0%E7%8B%AC%E7%AB%8B%E4%BA%8E%E8%AF%AD%E8%A8%80%C2%A0*%0A%0A*%20JSON%C2%A0%E5%85%B7%E6%9C%89%E8%87%AA%E6%88%91%E6%8F%8F%E8%BF%B0%E6%80%A7%EF%BC%8C%E6%9B%B4%E6%98%93%E7%90%86%E8%A7%A3%E3%80%82%0A%0A%E4%BD%BF%E7%94%A8json%E6%9D%A5%E4%BD%9C%E4%B8%BA%E5%8D%95%E7%89%87%E6%9C%BA%E8%BD%AF%E4%BB%B6%E8%A7%A3%E5%8C%85%E4%BA%A4%E4%BA%92%E7%9A%84%E6%96%B9%E5%BC%8F%E6%98%AF%E4%B8%80%E7%A7%8D%E8%83%BD%E5%A4%9F%E5%87%8F%E5%B0%91%E5%AF%B9%E5%8D%8F%E8%AE%AE%E5%92%8C%E8%A7%A3%E6%9E%90%E7%AE%97%E6%B3%95%E7%9A%84%E6%97%B6%E9%97%B4%E6%8A%95%E5%85%A5%EF%BC%8C%0A%E5%AF%B9%E4%BA%8E%E5%88%9D%E5%AD%A6%E8%80%85%E6%88%96%E8%80%85%E6%83%B3%E5%B0%9D%E8%AF%95json%E7%9A%84%E4%BA%BA%E6%9D%A5%E8%AF%B4%E6%98%AF%E4%B8%80%E7%A7%8D%E5%8F%AF%E4%BB%A5%E5%B0%9D%E8%AF%95%E4%B8%80%E4%B8%8B%E7%9A%84%E6%96%B0%E4%B8%9C%E8%A5%BF%E3%80%82%0A%0A%E4%BD%86%E6%98%AF%EF%BC%8C%E4%BD%BF%E7%94%A8%E8%AF%A5%E5%BA%93%E7%9A%84%E4%BB%A3%E4%BB%B7%E6%98%AF%E6%B6%88%E8%80%97%E5%A4%A7%E9%87%8F%E7%9A%84%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%E3%80%82%0A%E5%A4%A9%E4%B8%8B%E6%B2%A1%E6%9C%89%E5%85%8D%E8%B4%B9%E7%9A%84%E5%8D%88%E9%A4%90%EF%BC%8C%E4%B9%9F%E6%B2%A1%E6%9C%89%E5%8D%81%E5%85%A8%E5%8D%81%E7%BE%8E%E7%9A%84%E6%96%B9%E6%A1%88%EF%BC%8C%E6%88%91%E4%BB%AC%E5%8F%AA%E8%83%BD%E5%81%9A%E6%99%BA%E6%85%A7%E7%9A%84%E5%8F%96%E8%88%8D%E3%80%82%0A%0A%23%23%202.%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8ArduinoJson%E5%BA%93%0A%0A%E6%88%91%E4%BB%AC%E5%8F%AF%E4%BB%A5%E8%BF%9B%E5%85%A5%E5%AE%98%E7%BD%91%E8%BF%9B%E8%A1%8C%E5%AD%A6%E4%B9%A0%E8%AF%A5%E5%BA%93%EF%BC%8C%E5%AE%98%E6%96%B9%E7%BD%91%E5%9D%80%EF%BC%9Ahttps%3A%2F%2Farduinojson.org%E3%80%82%0A%0A%E5%80%BC%E5%BE%97%E4%B8%80%E8%AF%B4%E7%9A%84%E6%98%AF%EF%BC%8Carduino%E7%8E%B0%E5%9C%A8%E4%B8%8D%E4%BB%85%E6%98%AF%E4%B8%80%E4%B8%AA%E4%B8%BB%E6%B5%81%E5%BC%80%E6%BA%90%E5%B9%B3%E5%8F%B0%EF%BC%8C%E8%80%8C%E4%B8%94%E7%8E%B0%E5%9C%A8%E5%B9%B3%E5%8F%B0%E4%B8%8D%E5%8F%AA%E6%98%AF%E6%9C%89arduino%E7%9A%84%E5%87%A0%E6%AC%BE%0A%E5%8D%95%E5%93%81%E6%9C%BA%E5%B9%B3%E5%8F%B0%EF%BC%8C%E7%8E%B0%E5%9C%A8PIO%E7%9A%84%E6%94%AF%E6%8C%81%EF%BC%8Carduino%E6%A1%86%E6%9E%B6%E4%B8%8B%E5%8F%AF%E4%BB%A5%E6%94%AF%E6%8C%81%E4%B8%8A%E7%99%BE%E7%A7%8DMCU%EF%BC%8C%E5%A6%82%E6%9E%9C%E4%BD%BF%E7%94%A8%E8%AF%A5%E6%A1%86%E6%9E%B6%EF%BC%8C%E6%84%8F%E5%91%B3%E7%9D%80%E6%88%91%E4%BB%AC%E4%B9%9F%E5%8F%AF%E4%BB%A5%E5%9C%A8%0A%E5%85%B6%E4%BB%96%E6%9D%BF%E5%AD%90%E4%B8%8A%E9%9D%A2%E4%BD%BF%E7%94%A8arduino%E7%A7%8D%E7%9A%84%E5%BA%93%E3%80%82%E6%88%91%E5%B7%B2%E7%BB%8F%E4%BD%BF%E7%94%A8%E8%AF%A5%E5%BA%93%E8%BF%9B%E8%A1%8C%E6%B5%8B%E8%AF%95%EF%BC%8C%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83%E4%B8%BA%EF%BC%9ASTM32L475%E6%AD%A3%E7%82%B9%E5%8E%9F%E5%AD%90%E6%BD%98%E5%A4%9A%E6%8B%89%E5%BC%80%E5%8F%91%E6%9D%BF%E3%80%82%0A%0A%E8%BF%99%E9%87%8C%E9%A1%BA%E5%B8%A6%E9%99%84%E4%B8%80%E5%BC%A0%E5%9B%BE%E7%89%87%EF%BC%8C%E8%BF%99%E6%98%AF%E6%88%91%E4%BA%86%E8%A7%A3%E5%88%B0JSON%E5%BA%93%E7%9A%84%E4%B8%80%E5%BC%A0%E5%9B%BE%E7%89%87%EF%BC%9A%0A%0A!%5Bd6b8f710f367edad3322e10fd99ca1e4.jpeg%5D(en-resource%3A%2F%2Fdatabase%2F5512%3A0)%0A%0A%0A%23%23%203.%E6%B5%8B%E8%AF%95DEMO%0A%0A%E4%BD%BF%E7%94%A8%E8%AF%A5%E5%BA%93%E6%98%AF%E7%94%A8%E6%9D%A5%E8%A7%A3%E5%86%B3%E4%B8%B2%E5%8F%A3%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE%E7%9A%84%E8%A7%A3%E6%9E%90%E9%BA%BB%E7%83%A6%E3%80%82%E8%BF%99%E9%87%8C%E6%B5%8B%E8%AF%95%E7%9A%84demo%E4%BD%BF%E7%94%A8%E4%B8%A4%E5%9D%97arduino%20UNO%EF%BC%8C%E4%BD%BF%E7%94%A8%E8%BD%AF%E4%B8%B2%E5%8F%A3%E8%BF%9B%E8%A1%8C%E4%B8%BB%E4%BB%8E%E6%9C%BA%E9%80%9A%E4%BF%A1%E3%80%82%0A%0A%23%23%23%203.1%20%E4%B8%BB%E6%9C%BAdemo%0A%0A%E8%BF%99%E9%87%8C%E4%B8%BB%E6%9C%BA%E8%BF%9B%E8%A1%8C%E4%B8%A4%E4%B8%AA%E4%BF%A1%E5%8F%B7%E7%9A%84%E8%B5%8B%E5%80%BC%E6%93%8D%E4%BD%9C%EF%BC%8C%E7%84%B6%E5%90%8E%E5%B0%86%E4%BF%A1%E5%8F%B7%E5%86%99%E5%85%A5%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%AD%EF%BC%8C%E5%9C%A8%E4%B8%80%E5%AE%9A%E7%9A%84%E6%9D%A1%E4%BB%B6%E4%B8%8B%EF%BC%8C%E5%8F%91%E9%80%81%E7%BB%99%E4%BB%8E%E6%9C%BA%E3%80%82%0A%E4%B8%BB%E8%A6%81%E4%BB%A3%E7%A0%81%E6%AE%B5%EF%BC%9A%0A%0A%60%60%60cpp%0A%0A%0AStaticJsonDocument%3C200%3E%20doc%3B%C2%A0%20%2F%2F%E5%AE%9A%E4%B9%89%E5%86%85%E5%AD%98%E9%9D%99%E6%80%81200%EF%BC%8C%E5%87%86%E5%A4%87%E5%AD%98%E6%94%BE%E7%9A%84%E5%9C%B0%E6%96%B9%0A%0A%0A%0Avoid%20DataTxInit(void)%20%7B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2FSlave1%E4%B8%B2%E5%8F%A3%E5%88%9D%E5%A7%8B%E5%8C%96%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0jsonSerial.begin(9600)%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%0A%0A%7D%0A%0A%0A%0A%2F%2F%E6%95%B0%E6%8D%AE%E5%A4%84%E7%90%86%E4%BD%BF%E7%94%A8%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%A4%84%E7%90%86%E6%9D%A5%E5%81%9A%0A%0Avoid%20StringsPrcess(void)%20%7B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%7B%22Device%22%3A%22Slave1%22%2C%22StartSignal%22%3A0%2C%22ResetSignal%22%3A0%7D%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%7B%5C%22Device%5C%22%3A%5C%22Slave1%5C%22%2C%5C%22StartSignal%5C%22%3A0%2C%5C%22ResetSignal%5C%22%3A0%7D%0A%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%3D%20%22%7B%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%5C%22Device%5C%22%3A%5C%22Slave1%5C%22%2C%5C%22StartSignal%5C%22%3A%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20myBalanceAngle.aState%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%2C%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%5C%22ResetSignal%5C%22%3A%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20myBalanceAngle.fState%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%7D%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2FSerial.println(Slave1Control)%3B%0A%0A%7D%0A%0A%0A%0Abool%20lastaState%20%3D%20false%2C%20lastfState%20%3D%20false%3B%0A%0A%0A%0Avoid%20Slave1TxData(void)%20%7B%0A%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%E8%BF%99%E9%87%8C%E9%98%B2%E6%AD%A2%E8%AF%AF%E8%A7%A6%EF%BC%8C%E5%A6%82%E6%9E%9C%E8%BF%9E%E7%BB%AD%E6%8C%89%E4%B8%A4%E6%AC%A1%E5%90%8C%E4%B8%80%E4%B8%AA%E6%8C%89%E9%94%AE%EF%BC%8C%E4%B8%8D%E4%BC%9A%E8%A7%A6%E5%8F%91%E4%B8%A4%E6%AC%A1%E4%BD%BF%E8%83%BD%E4%BF%A1%E5%8F%B7%E3%80%82%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0if%20(myBalanceAngle.aState%20%3D%3D%201%20%7C%7C%20myBalanceAngle.fState%20%3D%3D%201)%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%E5%A6%82%E6%9E%9C%E5%8F%98%E9%87%8F%E8%A2%AB%E6%9B%B4%E6%94%B9%E4%BA%86%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0if%20(lastaState%20!%3D%20myBalanceAngle.aState%20%7C%7C%20lastfState%20!%3D%20%0AmyBalanceAngle.fState)%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%E5%8F%91%E9%80%81json%E5%BA%8F%E5%88%97%E5%88%B0%E4%BB%8E%E6%9C%BA%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0StringsPrcess()%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0jsonSerial.println(Slave1Control)%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7D%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%E6%8E%A5%E6%94%B6%E5%9B%9E%E5%A4%8D%E7%9A%84%E4%BF%A1%E6%81%AF%0A%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0lastaState%20%3D%20myBalanceAngle.aState%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0lastfState%20%3D%20myBalanceAngle.fState%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7D%0A%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0if%20(myBalanceAngle.aState%20%3D%3D%201)%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%E5%8F%91%E9%80%81%E4%BF%A1%E5%8F%B7%E4%B9%8B%E5%90%8E%E5%B0%86%E4%B8%BB%E6%9C%BA%E5%AF%84%E5%AD%98%E5%99%A8%E5%80%BC%E6%B8%85%E9%9B%B6%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0myBalanceAngle.aState%20%3D%200%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7D%0A%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0if%20(myBalanceAngle.fState%20%3D%3D%201)%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%E5%8F%91%E9%80%81%E4%BF%A1%E5%8F%B7%E4%B9%8B%E5%90%8E%E5%B0%86%E4%B8%BB%E6%9C%BA%E5%AF%84%E5%AD%98%E5%99%A8%E5%80%BC%E6%B8%85%E9%9B%B6%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0myBalanceAngle.fState%20%3D%200%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%7D%0A%0A%0A%0A%7D%0A%0A%0A%0A%0A%60%60%60%0A%0A%E9%A6%96%E5%85%88%EF%BC%8C%E6%88%91%E4%BB%AC%E9%9C%80%E8%A6%81%E6%98%8E%E7%99%BD%E4%B8%80%E7%82%B9%EF%BC%8C%E5%8F%91%E9%80%81%E4%BF%A1%E6%81%AF%E7%9A%84%E5%8D%95%E7%89%87%E6%9C%BA%EF%BC%8C%E5%8F%91%E9%80%81%E7%9A%84%E6%98%AF%E5%AD%97%E8%8A%82%EF%BC%8C%E4%B8%8D%E6%98%AFJSON%E8%AF%AD%E8%A8%80%E3%80%82%0A%0A%E5%A6%82%E6%9E%9C%E4%BD%A0%E6%87%82%E4%BA%86%E5%89%8D%E6%8F%90%EF%BC%8C%E6%88%91%E4%BB%AC%E6%8E%A5%E7%9D%80%E6%9D%A5%E4%BA%86%E8%A7%A3%E4%B8%80%E7%82%B9%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%A4%84%E7%90%86%E7%9A%84%E4%BA%8B%E6%83%85%E3%80%82%0A%E5%9C%A8arduino%E4%B8%AD%EF%BC%8C%E6%88%91%E4%BB%AC%E5%AE%9A%E4%B9%89%E4%B8%80%E4%B8%AAString%EF%BC%8C%E7%94%A8%E4%BA%8E%E5%86%99%E5%85%A5%E6%88%91%E4%BB%AC%E7%9A%84JSON%E8%AF%AD%E6%AE%B5%EF%BC%8C%E8%BF%99%E9%87%8C%E4%B8%BE%E4%B8%80%E4%B8%AA%E4%BE%8B%E5%AD%90%EF%BC%9A%0A%60%60%60json%0A%0A%7B%C2%A0%C2%A0%C2%A0%0A%20%20%20%20%22Device%22%3A%22Slave1%22%2C%C2%A0%C2%A0%C2%A0%0A%20%20%20%20%22StartSignal%22%3A%200%2C%C2%A0%C2%A0%C2%A0%0A%20%20%20%20%22ResetSignal%22%3A%200%0A%20%7D%0A%0A%60%60%60%0A%E8%BF%99%E9%87%8C%E6%98%AF%E6%88%91%E4%BB%AC%E8%A6%81%E8%BF%9B%E8%A1%8C%E5%8F%91%E9%80%81%E7%9A%84json%E8%AF%AD%E6%AE%B5%EF%BC%8C%E6%88%91%E4%BB%AC%E5%AE%9A%E4%B9%89%E4%BA%86%E5%8F%91%E9%80%81%E7%9A%84%E6%8E%A5%E6%94%B6%E8%AE%BE%E5%A4%87%E5%8F%B7%EF%BC%9A%20%22Device%22%EF%BC%8C%E4%BB%96%E7%9A%84key%E5%80%BC%E4%B8%BA%EF%BC%9A%22Slave1%22%E3%80%82%0A%E6%8E%A5%E7%9D%80%EF%BC%8C%E7%AC%AC%E4%BA%8C%E4%B8%AA%E5%92%8C%E7%AC%AC%E4%B8%89%E4%B8%AAkey%E7%9A%84%E5%90%8D%E5%AD%97%E4%B8%BA%E4%B8%A4%E4%B8%AA%E5%8F%91%E9%80%81%E7%9A%84%E4%BF%A1%E5%8F%B7%E7%9A%84%E5%90%8D%E5%AD%97%EF%BC%8C%E5%88%86%E5%88%AB%E4%B8%BA%EF%BC%9A%20%20%22StartSignal%22%E5%92%8C%20%22ResetSignal%22%EF%BC%8C%0A%E4%BB%96%E4%BB%AC%E7%9A%84key%E5%80%BC%E6%88%91%E4%BB%AC%E8%BF%9B%E8%A1%8C%E4%BA%86%E9%BB%98%E8%AE%A4%E7%9A%84%E4%B8%BA0%E3%80%82%0A%0A%E5%A5%BD%E7%9A%84%EF%BC%8C%E8%BF%99%E9%87%8C%E7%9A%84json%E5%8F%91%E9%80%81%E7%9A%84%E6%95%B0%E6%8D%AE%E5%B0%B1%E4%BB%8B%E7%BB%8D%E5%AE%8C%E4%BA%86%E3%80%82%0A%E9%82%A3%E4%B9%88%EF%BC%8C%E6%88%91%E4%BB%AC%E8%BF%9B%E8%A1%8C%E5%8F%91%E9%80%81%E8%BF%99%E4%B8%80%E6%95%B0%E6%8D%AE%E6%98%AF%E6%80%8E%E4%B9%88%E5%81%9A%E7%9A%84%E5%91%A2%EF%BC%9F%0A%0A%E5%9C%A8%E6%88%91%E8%BF%9B%E8%A1%8C%E6%B5%8B%E8%AF%95%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E9%A6%96%E5%85%88%E6%98%AF%E4%BD%BF%E7%94%A8char%E6%95%B0%E7%BB%84%E6%9D%A5%E8%BF%9B%E8%A1%8Cjson%E5%AD%97%E7%AC%A6%E4%BF%9D%E5%AD%98%E7%9A%84%EF%BC%8C%E5%8F%AF%E6%98%AF%E6%88%91%E5%8F%91%E7%8E%B0%E8%BF%99%E7%A7%8D%E6%96%B9%E5%BC%8F%E6%B2%A1%E6%9C%89String%E7%9A%84%E6%96%B9%0A%E6%B3%95%E6%96%B9%E4%BE%BF%E3%80%82%0A%0A%E4%BD%BF%E7%94%A8arduino%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%A4%84%E7%90%86%E5%8A%9F%E8%83%BD%EF%BC%8C%E5%8F%AF%E4%BB%A5%E6%96%B9%E4%BE%BF%E7%9A%84%E5%81%9A%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%8A%A0%E6%B3%95%EF%BC%8C%E6%88%91%E4%BB%AC%E5%8F%AF%E4%BB%A5%E5%B0%86%E6%88%91%E4%BB%AC%E7%9A%84%E6%95%B0%E6%8D%AE%E6%88%96%E8%80%85%E5%AD%97%E6%AF%8D%E6%B7%BB%E5%8A%A0%E5%88%B0%E5%AD%97%E7%AC%A6%E4%B8%B2%0A%E4%B8%AD%E3%80%82%E4%BE%8B%E5%A6%82%E4%B8%8A%E9%9D%A2%E4%BB%A3%E7%A0%81%E4%B8%AD%E5%A4%84%E7%90%86%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%87%BD%E6%95%B0%EF%BC%9A%0A%60%60%60cpp%0A%0A%2F%2F%E6%95%B0%E6%8D%AE%E5%A4%84%E7%90%86%E4%BD%BF%E7%94%A8%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%A4%84%E7%90%86%E6%9D%A5%E5%81%9A%0A%0Avoid%20StringsPrcess(void)%20%7B%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2F%7B%5C%22Device%5C%22%3A%5C%22Slave1%5C%22%2C%5C%22StartSignal%5C%22%3A0%2C%5C%22ResetSignal%5C%22%3A0%7D%0A%0A%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%3D%20%22%7B%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%5C%22Device%5C%22%3A%5C%22Slave1%5C%22%2C%5C%22StartSignal%5C%22%3A%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20myBalanceAngle.aState%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%2C%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%5C%22ResetSignal%5C%22%3A%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20myBalanceAngle.fState%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0Slave1Control%20%2B%3D%20%22%7D%22%3B%0A%0A%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%C2%A0%2F%2FSerial.println(Slave1Control)%3B%0A%0A%7D%0A%60%60%60%0A%0A%E4%BB%A3%E7%A0%81%E4%B8%AD%E7%9A%84%E5%8F%98%E9%87%8F%E7%9A%84%E5%80%BC%EF%BC%8C%E4%B9%9F%E5%B0%B1%E6%98%AF%EF%BC%9AmyBalanceAngle.aState%E5%92%8CmyBalanceAngle.fState%EF%BC%8C%E6%98%AF%E6%88%91%E4%BB%AC%E8%A6%81%E5%8F%91%E9%80%81%E7%9A%84%E4%BF%A1%E5%8F%B7%E5%80%BC%E3%80%82%0A%0A%E8%BF%99%E9%87%8C%E9%9C%80%E8%A6%81%E6%8C%87%E5%87%BA%E7%9A%84%E6%98%AF%EF%BC%8C%E5%8F%98%E9%87%8F%E6%98%AF%E5%9C%A8%E4%BC%A0%E6%84%9F%E5%99%A8%E8%AF%BB%E5%85%A5%E6%95%B0%E6%8D%AE%E5%90%8E%E4%BE%BF%E4%BC%9A%E6%9B%B4%E6%96%B0%EF%BC%8C%E6%9B%B4%E6%96%B0%E4%B9%8B%E5%90%8E%EF%BC%8C%E6%88%91%E4%BB%AC%E9%80%9A%E8%BF%87%E6%9D%A1%E4%BB%B6%E7%9A%84%E5%88%A4%E6%96%AD%E6%9D%A5%E5%B0%86json%E8%AF%AD%E6%AE%B5%0A%E8%BF%9B%E8%A1%8C%E5%A4%84%E7%90%86%E6%9B%B4%E6%96%B0%E3%80%82%E8%BF%99%E4%BE%BF%E6%98%AF%E4%BB%A5%E4%B8%8A%E7%9A%84%E4%BB%A3%E7%A0%81%E5%81%9A%E7%9A%84%E4%BA%8B%E6%83%85%E3%80%82%0A%0A%0A%23%23%203.2%20%E4%BB%8E%E6%9C%BAdemo%0A%0A%E4%BB%8E%E6%9C%BA%E9%9C%80%E8%A6%81%E4%BF%9D%E5%AD%98%E4%B8%BB%E6%9C%BA%E5%8F%91%E8%BF%87%E6%9D%A5%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%95%B0%E6%8D%AE%EF%BC%8C%E7%84%B6%E5%90%8E%E8%A7%A3%E6%9E%90%E6%95%B0%E6%8D%AE%EF%BC%8C%E5%B9%B6%E4%B8%94%E5%B0%86%E6%9C%89%E7%94%A8%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E3%80%82%0A%E4%B8%BB%E8%A6%81%E4%BB%A3%E7%A0%81%E6%AE%B5%EF%BC%9A%0A%60%60%60cpp%0A%0A%23include%20%3CSoftwareSerial.h%3E%0A%23include%20%3CArduinoJson.h%3E%0A%0A%2F%2F%7B%22Device%22%3A%22vibration_motor%22%2C%22SetSpd%22%3A%5B3%2C3%2C3%2C3%5D%2C%22WorkState%22%3A0%7D%0AStaticJsonDocument%3C200%3E%20doc%3B%20%20%2F%2F%E5%AE%9A%E4%B9%89%E5%86%85%E5%AD%98%E9%9D%99%E6%80%81200%EF%BC%8C%E5%87%86%E5%A4%87%E5%AD%98%E6%94%BE%E7%9A%84%E5%9C%B0%E6%96%B9%0ASoftwareSerial%20mySerial(4%2C5)%3B%20%2F%2F%20RX%2C%20TX%0A%0A%23define%20JsonLength%20100%0Achar%20json%5BJsonLength%5D%3B%2F%2F%E7%94%A8%E4%BA%8E%E5%AD%98%E6%94%BE%E7%9A%84%E9%95%BF%E5%BA%A6%E8%A6%81%E5%A4%A7%E4%BA%8EJSON%E5%8F%91%E9%80%81%E7%9A%84%E9%95%BF%E5%BA%A6%0AString%20data%20%3D%20%22%22%3B%0A%0Abool%20myaState%20%3D%20false%3B%2F%2F%E7%94%A8%E6%9D%A5%E6%A0%87%E5%BF%97%E5%90%AF%E5%8A%A8%E7%A8%8B%E5%BA%8F%E7%9A%84FLAG%0Abool%20myfState%20%3D%20false%3B%2F%2F%E7%94%A8%E6%9D%A5%E6%A0%87%E5%BF%97%E5%A4%8D%E4%BD%8D%E7%94%B5%E6%9C%BA%E7%9A%84FLAG%0A%0Avoid%20setup()%20%7B%0A%20%20%0A%20%20%2F%2F%20put%20your%20setup%20code%20here%2C%20to%20run%20once%3A%0A%20%20Serial.begin(9600)%3B%0A%20%20mySerial.begin(9600)%3B%0A%20%20%0A%7D%0A%0Abool%20ReceiveFlag%20%3D%20false%3B%0A%0Avoid%20loop()%20%7B%0A%0A%20%20%2F%2FmySerial.listen()%3B%0A%20%20while(mySerial.available()%3E0)%7B%0A%20%20%20%20data%20%2B%3D%20(char)(mySerial.read())%3B%0A%20%20%20%20ReceiveFlag%20%3D%20true%3B%0A%20%20%7D%0A%20%20%0A%20%20if(ReceiveFlag)%7B%0A%0A%20%20%20%20data.toCharArray(json%2CJsonLength)%3B%0A%20%20%20%20DeserializationError%20error%20%3D%20deserializeJson(doc%2C%20json)%3B%0A%20%20%20%20%0A%20%20%20%20if(!error)%7B%0A%20%20%20%20%20%20%2F%2FserializeJsonPretty(doc%2C%20Serial)%3B%0A%20%20%20%20%20%20myaState%20%3D%20doc%5B%22StartSignal%22%5D%3B%0A%20%20%20%20%20%20Serial.print(%22myaState%20%3D%20%22)%3B%0A%20%20%20%20%20%20Serial.print(myaState)%3B%0A%20%20%20%20%20%20Serial.print(%22%20%20%22)%3B%0A%20%20%20%20%20%20myfState%20%3D%20doc%5B%22ResetSignal%22%5D%3B%0A%20%20%20%20%20%20Serial.print(%22myfState%20%3D%20%22)%3B%0A%20%20%20%20%20%20Serial.println(myfState)%3B%0A%20%20%20%20%20%20ReceiveFlag%3Dfalse%3B%0A%20%20%20%20%20%20data%20%3D%20%22%22%3B%0A%20%20%20%20%20%7D%0A%20%20%20%20%0A%20%20%7D%0A%20%20%0A%20delay(20)%3B%0A%7D%0A%0A%0A%60%60%60%0A%0A%E8%BF%99%E9%87%8C%E4%BB%8E%E6%9C%BA%E9%9C%80%E8%A6%81%E9%A6%96%E5%85%88%E6%8E%A5%E6%94%B6%E5%88%B0%E4%B8%BB%E6%9C%BA%E5%8F%91%E9%80%81%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%E3%80%82%E8%BF%99%E9%87%8C%E5%81%87%E8%AE%BE%E6%88%91%E4%BB%AC%E7%9A%84%E4%B8%BB%E6%9C%BA%E5%8F%91%E9%80%81%E7%9A%84%E6%95%B0%E6%8D%AE%E5%8F%AA%E6%9C%89%E4%B8%80%E4%B8%AAjson%0A%E8%AF%AD%E5%8F%A5%E3%80%82%E6%89%80%E4%BB%A5%E6%88%91%E4%BB%AC%E4%BD%BF%E7%94%A8%E4%B8%80%E4%B8%AAString%E6%9D%A5%E4%BF%9D%E5%AD%98%E6%AF%8F%E6%AC%A1%E5%8F%91%E9%80%81%E8%BF%87%E6%9D%A5%E7%9A%84%E6%95%B0%E6%8D%AE%E3%80%82%E6%8E%A5%E6%94%B6%E6%95%B0%E6%8D%AE%E7%9A%84%E4%BB%A3%E7%A0%81%E4%B8%BA%EF%BC%9A%0A%0A%60%60%60cpp%0A%0A%20while(mySerial.available()%3E0)%7B%0A%20%20%20%20data%20%2B%3D%20(char)(mySerial.read())%3B%0A%20%20%20%20ReceiveFlag%20%3D%20true%3B%0A%20%20%7D%0A%0A%60%60%60%0A%0A%0A%E4%BD%BF%E7%94%A8%E7%9A%84ArduinoJson%E5%BA%93%E4%B8%AD%E7%BB%99%E5%87%BA%E7%9A%84example%E4%B8%AD%E9%83%BD%E6%98%AF%E5%A4%84%E7%90%86char%E6%95%B0%E7%BB%84%EF%BC%8C%E8%BF%99%E9%87%8C%E6%88%91%E4%B9%9F%E6%98%AF%E5%B0%9D%E8%AF%95%E8%83%BD%E4%B8%8D%E8%83%BD%E4%BD%BF%E7%94%A8json%E5%BA%93%0A%E7%9B%B4%E6%8E%A5%E5%A4%84%E7%90%86%E6%88%91%E4%BB%AC%E7%9A%84string%E5%91%A2%EF%BC%9F%0A%0A%E6%88%91%E6%B5%8B%E8%AF%95%E5%90%8E%EF%BC%8C%E5%8F%91%E7%8E%B0%E6%88%91%E8%87%AA%E5%B7%B1%E7%9B%B4%E6%8E%A5%E7%9A%84%E8%A7%A3%E6%9E%90string%E6%98%AF%E4%B8%8D%E5%8F%AF%E4%BB%A5%E7%9A%84%E3%80%82%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E5%8F%AF%E4%BB%A5%EF%BC%9F%E5%9B%A0%E4%B8%BA%E6%88%91%E8%87%AA%E5%B7%B1%E6%B5%8B%E8%AF%95%E9%94%99%E4%BA%86%E3%80%82%0A%0A%E5%9C%A8%E5%86%99%E8%BF%99%E7%AF%87%E5%8D%9A%E6%96%87%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E6%88%91%E5%9B%9E%E5%8E%BB%E9%87%8D%E6%96%B0%E5%81%9A%E4%BA%86%E6%B5%8B%E8%AF%95%EF%BC%8C%E4%BD%BF%E7%94%A8string%E7%9B%B4%E6%8E%A5%E8%BF%9B%E8%A1%8C%E8%A7%A3%E6%9E%90%EF%BC%8C%E6%98%AF%E5%8F%AF%E4%BB%A5%E7%9A%84%E3%80%82%0A%0A%E6%B5%8B%E8%AF%95%E4%BB%A3%E7%A0%81%EF%BC%9A%0A%60%60%60cpp%0A%0A%0A%23include%20%3CSoftwareSerial.h%3E%0A%23include%20%3CArduinoJson.h%3E%0A%0A%2F%2F%7B%22Device%22%3A%22vibration_motor%22%2C%22SetSpd%22%3A%5B3%2C3%2C3%2C3%5D%2C%22WorkState%22%3A0%7D%0AStaticJsonDocument%3C200%3E%20doc%3B%20%20%2F%2F%E5%AE%9A%E4%B9%89%E5%86%85%E5%AD%98%E9%9D%99%E6%80%81200%EF%BC%8C%E5%87%86%E5%A4%87%E5%AD%98%E6%94%BE%E7%9A%84%E5%9C%B0%E6%96%B9%0ASoftwareSerial%20mySerial(4%2C5)%3B%20%2F%2F%20RX%2C%20TX%0A%0A%2F%2F%23define%20JsonLength%20100%0A%2F%2Fchar%20json%5BJsonLength%5D%3B%2F%2F%E7%94%A8%E4%BA%8E%E5%AD%98%E6%94%BE%E7%9A%84%E9%95%BF%E5%BA%A6%E8%A6%81%E5%A4%A7%E4%BA%8EJSON%E5%8F%91%E9%80%81%E7%9A%84%E9%95%BF%E5%BA%A6%0AString%20data%20%3D%20%22%22%3B%0A%0Abool%20ReceiveFlag%20%3D%20false%3B%0Abool%20myaState%20%3D%20false%3B%2F%2F%E7%94%A8%E6%9D%A5%E6%A0%87%E5%BF%97%E5%90%AF%E5%8A%A8%E7%A8%8B%E5%BA%8F%E7%9A%84FLAG%0Abool%20myfState%20%3D%20false%3B%2F%2F%E7%94%A8%E6%9D%A5%E6%A0%87%E5%BF%97%E5%A4%8D%E4%BD%8D%E7%94%B5%E6%9C%BA%E7%9A%84FLAG%0A%0A%0Avoid%20setup()%20%7B%0A%20%20%0A%20%20%2F%2F%20put%20your%20setup%20code%20here%2C%20to%20run%20once%3A%0A%20%20Serial.begin(9600)%3B%0A%20%20mySerial.begin(9600)%3B%0A%20%20%0A%7D%0A%0A%0A%0A%0A%0Avoid%20loop()%20%7B%0A%20%20%2F%2F%20put%20your%20main%20code%20here%2C%20to%20run%20repeatedly%3A%0A%20%20%2F%2FmySerial.listen()%3B%0A%20%20while(mySerial.available()%3E0)%7B%0A%20%20%20%20data%20%2B%3D%20(char)(mySerial.read())%3B%0A%20%20%20%20ReceiveFlag%20%3D%20true%3B%0A%20%20%7D%0A%20%20%0A%20%20if(ReceiveFlag)%7B%0A%0A%20%20%20%20%2F%2Fdata.toCharArray(json%2CJsonLength)%3B%0A%20%20%20%20DeserializationError%20error%20%3D%20deserializeJson(doc%2C%20data)%3B%0A%20%20%20%20if(!error)%7B%0A%20%20%20%20%20%20%2F%2FserializeJsonPretty(doc%2C%20Serial)%3B%0A%20%20%20%20%20%20myaState%20%3D%20doc%5B%22StartSignal%22%5D%3B%0A%20%20%20%20%20%20Serial.print(%22myaState%20%3D%20%22)%3B%0A%20%20%20%20%20%20Serial.print(myaState)%3B%0A%20%20%20%20%20%20Serial.print(%22%20%20%22)%3B%0A%20%20%20%20%20%20myfState%20%3D%20doc%5B%22ResetSignal%22%5D%3B%0A%20%20%20%20%20%20Serial.print(%22myfState%20%3D%20%22)%3B%0A%20%20%20%20%20%20Serial.println(myfState)%3B%0A%20%20%20%20%20%20ReceiveFlag%3Dfalse%3B%0A%20%20%20%20%20%20data%20%3D%20%22%22%3B%0A%20%20%20%20%20%7D%0A%20%20%20%20%0A%20%20%7D%0A%20%20%0A%20delay(20)%3B%0A%7D%0A%0A%0A%60%60%60%0A%E6%B5%8B%E8%AF%95%E7%BB%93%E6%9E%9C%E4%B8%BA%EF%BC%9A%0A%0A!%5B11932e4e42c7a68c6d5cd885cdacc5a4.png%5D(en-resource%3A%2F%2Fdatabase%2F5514%3A0)%0A%0A%0A%E7%9C%8B%E5%88%B0%E6%B5%8B%E8%AF%95%E7%BB%93%E6%9E%9C%EF%BC%8C%E6%88%91%E4%BB%AC%E5%9B%9E%E5%88%B0%E4%BB%A3%E7%A0%81%E3%80%82json%E5%BA%93%E6%80%8E%E4%B9%88%E4%BD%BF%E7%94%A8%E8%A7%A3%E6%9E%90%E5%BE%97%E5%88%B0%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%EF%BC%8C%E4%BB%8E%E8%80%8C%E5%BE%97%E5%88%B0%E6%88%91%E4%BB%AC%E6%83%B3%E8%A6%81%E7%9A%84key%E7%9A%84%E5%80%BC%E5%91%A2%EF%BC%9F%0A%0A%E9%A6%96%E5%85%88%E6%88%91%E4%BB%AC%E5%AE%9A%E4%B9%89%E4%BA%86%E5%AD%98%E6%94%BEjson%E8%A7%A3%E6%9E%90%E5%90%8E%E6%95%B0%E6%8D%AE%E7%9A%84%E5%86%85%E5%AD%98%E7%A9%BA%E9%97%B4%EF%BC%9A%0A%60StaticJsonDocument%3C200%3E%20doc%3B%20%20%2F%2F%E5%AE%9A%E4%B9%89%E5%86%85%E5%AD%98%E9%9D%99%E6%80%81200%EF%BC%8C%E5%87%86%E5%A4%87%E5%AD%98%E6%94%BE%E7%9A%84%E5%9C%B0%E6%96%B9%60%0A%E6%8E%A5%E7%9D%80%EF%BC%8C%E5%A3%B0%E6%98%8E%E4%BD%BF%E7%94%A8%E7%9A%84%E7%94%A8%E4%BA%8E%E6%8E%A5%E6%94%B6%E4%B8%B2%E5%8F%A3%E6%95%B0%E6%8D%AE%E7%9A%84%E5%AD%97%E7%AC%A6%E4%B8%B2%EF%BC%9A%0A%60String%20data%20%3D%20%22%22%3B%60%0A%E5%9C%A8loop%E4%B8%AD%EF%BC%8C%E6%88%91%E4%BB%AC%E4%BD%BF%E7%94%A8%E4%B8%B2%E5%8F%A3%E5%BE%AA%E7%8E%AF%E8%AF%BB%E5%85%A5%E6%95%B0%E6%8D%AE%EF%BC%8C%E6%9C%80%E7%BB%88%E5%B0%86%E6%89%80%E6%9C%89%E7%9A%84%E6%95%B0%E6%8D%AE%E5%AD%98%E6%94%BE%E5%9C%A8data%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%AD%EF%BC%8C%E7%84%B6%E5%90%8E%E8%BF%9B%E8%A1%8C%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%0A%E8%A7%A3%E6%9E%90%EF%BC%8C%E8%BF%99%E9%87%8C%E7%9A%84%E4%BB%A3%E7%A0%81%E6%88%91%E4%BB%AC%E4%BD%BF%E7%94%A8%E4%BA%86%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%87%BD%E6%95%B0%EF%BC%9A%0A%60DeserializationError%20error%20%3D%20deserializeJson(doc%2C%20data)%3B%60%0A%E8%BF%99%E9%87%8C%E7%9A%84%E8%BF%94%E5%9B%9E%E5%80%BC%E6%98%AFerror%EF%BC%8C%E5%A6%82%E6%9E%9C%E8%A7%A3%E6%9E%90%E9%94%99%E8%AF%AF%EF%BC%8C%E8%BF%94%E5%9B%9E%E5%80%BC%E4%B8%BA1%EF%BC%8C%E6%AD%A3%E7%A1%AE%E8%A7%A3%E6%9E%90%EF%BC%8C%E8%BF%94%E5%9B%9E%E5%80%BC%E4%B8%BA0%E3%80%82%0A%E8%BF%99%E9%87%8C%E4%BD%BF%E7%94%A8if%E5%88%A4%E6%96%AD%EF%BC%8C%E9%94%99%E8%AF%AF%E8%A7%A3%E6%9E%90%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E5%88%99%E4%B8%8D%E4%BC%9A%E8%BF%9B%E8%A1%8C%E6%88%91%E4%BB%AC%E7%9A%84%E5%A4%84%E7%90%86%E3%80%82%0A%0A%E6%8E%A5%E4%B8%8B%E6%9D%A5%E6%98%AF%E4%BD%BF%E7%94%A8%E8%A7%A3%E6%9E%90%E5%90%8E%E7%9A%84doc%E4%B8%AD%E7%9A%84key%E7%9A%84%E5%90%8D%E5%AD%97%E6%9D%A5%E5%8F%96key%E7%9A%84%E5%80%BC%EF%BC%8C%E8%BF%99%E9%87%8C%E4%BD%BF%E7%94%A8%E7%9A%84%E4%BB%A3%E7%A0%81%EF%BC%9A%0A%60%60%60cpp%0A%0A%20%20%20%20%20%20myaState%20%3D%20doc%5B%22StartSignal%22%5D%3B%0A%20%20%20%20%20%20Serial.print(%22myaState%20%3D%20%22)%3B%0A%20%20%20%20%20%20Serial.print(myaState)%3B%0A%20%20%20%20%20%20Serial.print(%22%20%20%22)%3B%0A%20%20%20%20%20%20myfState%20%3D%20doc%5B%22ResetSignal%22%5D%3B%0A%20%20%20%20%20%20Serial.print(%22myfState%20%3D%20%22)%3B%0A%20%20%20%20%20%20Serial.println(myfState)%3B%0A%20%20%20%20%0A%60%60%60%0A%0A%E8%BF%99%E6%A0%B7%EF%BC%8C%E6%88%91%E4%BB%AC%E5%B0%B1%E8%BE%BE%E5%88%B0%E4%BA%86%E6%88%91%E4%BB%AC%E7%9A%84%E7%9B%AE%E7%9A%84%E3%80%82%0A%0A%23%204.%E6%80%BB%E7%BB%93%0A%0A%E4%BD%BF%E7%94%A8json%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8Fkey%E7%9A%84%E5%90%8D%E5%AD%97%E5%92%8C%E5%80%BC%EF%BC%8C%E4%BB%96%E4%BB%AC%E7%9A%84%E6%9E%84%E9%80%A0%E5%8F%AF%E4%BB%A5%E4%BD%BF%E7%94%A8%E8%AF%A5%E7%BD%91%E7%AB%99%E8%BF%9B%E8%A1%8C%E8%BE%85%E5%8A%A9%EF%BC%9Ahttps%3A%2F%2Fwww.json.cn%E3%80%82%0A%E5%8F%A6%E5%A4%96%EF%BC%8CArduinoJson%E5%AE%98%E7%BD%91%E4%B8%AD%EF%BC%8C%E4%B9%9F%E6%9C%89%E7%9B%B8%E5%BD%93%E4%B8%8D%E9%94%99%E7%9A%84%E5%B7%A5%E5%85%B7%EF%BC%9Ahttps%3A%2F%2Farduinojson.org%2Fv6%2Fassistant%E3%80%82%0A%0A%E5%AF%B9%E4%BA%8EJSON%EF%BC%8C%E6%88%91%E4%BB%AC%E5%8F%AF%E4%BB%A5%E5%88%A9%E7%94%A8%E4%BB%96%E6%9D%A5%E5%81%9A%E5%BF%AB%E9%80%9F%E9%A1%B9%E7%9B%AE%E5%BC%80%E5%8F%91%EF%BC%8C%E8%A7%A3%E5%86%B3%E6%95%B0%E6%8D%AE%E5%8C%85%E7%9A%84%E5%8D%8F%E8%AE%AE%E5%A4%8D%E6%9D%82%E5%9B%B0%E9%9A%BE%E3%80%82%0A%0A</center></span>
+</div></body></html> 
